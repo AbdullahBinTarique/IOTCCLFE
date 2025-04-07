@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Live Sensor Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        canvas {
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+
+        table {
+            margin: 2rem auto;
+            border-collapse: collapse;
+            width: 60%;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #ccc;
+        }
+
+        th,
+        td {
+            padding: 0.75rem;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        #vibrationText {
+            margin: 1rem 0;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Live Sensor Dashboard</h1>
+
+    <canvas id="tempChart"></canvas>
+    <canvas id="humidityChart"></canvas>
+    <h2 id="vibrationText">Vibration: --</h2>
+
+    <h2>Inventory</h2>
+    <table id="inventoryTable">
+        <thead>
+            <tr>
+                <th>Product ID</th>
+                <th>Product Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data rows will be inserted dynamically -->
+        </tbody>
+    </table>
+
+    <script>
+        const tempCtx = document.getElementById('tempChart').getContext('2d');
+        const humidityCtx = document.getElementById('humidityChart').getContext('2d');
+        const labels = Array.from({ length: 10 }, (_, i) => `T-${9 - i}s`);
+
+        const tempChart = new Chart(tempCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    data: [],
+                    borderColor: 'red',
+                    fill: false
+                }]
+            }
+        });
+
+        const humidityChart = new Chart(humidityCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Humidity (%)',
+                    data: [],
+                    borderColor: 'blue',
+                    fill: false
+                }]
+            }
+        });
+
+        async function updateCharts() {
+            try {
+                const response = await fetch('/api/chart-data');
+                const data = await response.json();
+
+                tempChart.data.datasets[0].data = data.temperature;
+                tempChart.update();
+
+                humidityChart.data.datasets[0].data = data.humidity;
+                humidityChart.update();
+
+                const vibration = data.vibration.at(-1);
+                document.getElementById('vibrationText').textContent =
+                    'Vibration: ' + (vibration ? 'YES' : 'NO');
+            } catch (err) {
+                console.error('Chart AJAX error:', err);
+            }
+        }
+
+        async function updateInventoryTable() {
+            try {
+                const response = await fetch('http://52.91.26.28:3000/api/inventoryData');
+                const inventory = await response.json();
+
+                const tbody = document.querySelector('#inventoryTable tbody');
+                tbody.innerHTML = ''; // Clear the existing rows
+
+                inventory.forEach(item => {
+                    const row = document.createElement('tr');
+
+                    const idCell = document.createElement('td');
+                    idCell.textContent = item.prod_id;
+
+                    const countCell = document.createElement('td');
+                    countCell.textContent = item.prod_count;
+
+                    row.appendChild(idCell);
+                    row.appendChild(countCell);
+                    tbody.appendChild(row);
+                });
+
+            } catch (err) {
+                console.error('Inventory AJAX error:', err);
+            }
+        }
+
+        // Update both charts and table every 5 seconds
+        setInterval(() => {
+            updateCharts();
+            updateInventoryTable();
+        }, 5000);
+
+        // Initial load
+        updateCharts();
+        updateInventoryTable();
+    </script>
+</body>
+
+</html>
